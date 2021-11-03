@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS departments, meetingRooms, employees, eContacts, health_declaration, junior, booker, senior, manager, sessions, session_part, mr_update CASCADE;
+DROP TABLE IF EXISTS departments, meetingRooms, employees, eContacts, health_declaration, sessions, session_part, mr_update CASCADE;
 
 
 CREATE TABLE departments (
@@ -18,13 +18,14 @@ CREATE TABLE meetingRooms (
 );
 
 CREATE TABLE employees (
-   eid BIGSERIAL PRIMARY KEY,
+   eid serial PRIMARY KEY,
    ename VARCHAR(255),
    email VARCHAR(255) UNIQUE,
    resigned_date DATE DEFAULT NULL,
    -- participation constraint
    did integer,
    kind integer check((kind >= 0 AND kind <= 2) OR kind IS NULL),
+   qe_date DATE DEFAULT NULL,
    -- works in department
    FOREIGN KEY (did) REFERENCES departments (did) ON UPDATE CASCADE
 );
@@ -38,13 +39,20 @@ CREATE TABLE eContacts (
 
 CREATE TABLE health_declaration (
    eid integer,
-   ddate DATE DEFAULT CURRENT_DATE,
+   ddate DATE NOT NULL DEFAULT CURRENT_DATE check (ddate >= CURRENT_DATE),
    temp float8 NOT NULL check (temp >= 34 AND temp <= 43),
-   fever BOOLEAN NOT NULL,
+   fever boolean NOT NULL,
    PRIMARY KEY(eid, ddate),
    -- Weak entity
    FOREIGN KEY (eid) REFERENCES employees (eid) ON UPDATE CASCADE
 );
+
+
+-- CREATE TABLE quarantine (
+--    eid integer PRIMARY KEY,
+--    edate DATE NOT NULL
+--    FOREIGN KEY (eid) REFERENCES employees (eid) ON UPDATE CASCADE
+-- )
 
 -- -- ISA employee
 -- CREATE TABLE junior (
