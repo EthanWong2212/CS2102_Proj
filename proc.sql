@@ -8,19 +8,9 @@
 -- $$
 -- LANGUAGE plpgsql;
 
-/*
-* Basic functionalities
-*/
--- TRIGGER FOR EMPLOYEE RESIGNING
-DROP TRIGGER IF EXISTS resigning_employee ON employees;
-CREATE TRIGGER resigning_employee
-BEFORE UPDATE ON employees
--- RESIGNED DATE IS NOT NULL IMPLIES RESIGNATION
-FOR EACH ROW WHEN (NEW.resigned_date IS NOT NULL)
-EXECUTE FUNCTION handle_leave_future();
 
 -- LEAVES FUTURE COMMITMENTS
-CREATE OR REPLACE FUNCTION handle_leave_future ()
+CREATE OR REPLACE FUNCTION handle_leave_future()
 RETURNS TRIGGER
 AS $$
 BEGIN
@@ -43,14 +33,16 @@ END;
 $$
 LANGUAGE plpgsql;
 
-
-
--- TRIGGER FOR DELETING DEPARTMENT
-DROP TRIGGER IF EXISTS del_dep_trig ON departments;
-CREATE TRIGGER del_dep_trig
-BEFORE DELETE ON departments
-FOR EACH ROW
-EXECUTE FUNCTION del_dep();
+/*
+* Basic functionalities
+*/
+-- TRIGGER FOR EMPLOYEE RESIGNING
+DROP TRIGGER IF EXISTS resigning_employee ON employees;
+CREATE TRIGGER resigning_employee
+BEFORE UPDATE ON employees
+-- RESIGNED DATE IS NOT NULL IMPLIES RESIGNATION
+FOR EACH ROW WHEN (NEW.resigned_date IS NOT NULL)
+EXECUTE FUNCTION handle_leave_future();
 
 -- SETS meetingRooms did to null to indicate deleted
 CREATE OR REPLACE FUNCTION del_dep()
@@ -73,12 +65,13 @@ END;
 $$
 LANGUAGE plpgsql;
 
--- TRIGGER FOR TEMPERATURE DECLARATION
-DROP TRIGGER IF EXISTS temp_declared ON health_declaration;
-CREATE TRIGGER temp_declared
-BEFORE INSERT ON health_declaration
-FOR EACH ROW EXECUTE FUNCTION check_fever();
 
+-- TRIGGER FOR DELETING DEPARTMENT
+DROP TRIGGER IF EXISTS del_dep_trig ON departments;
+CREATE TRIGGER del_dep_trig
+BEFORE DELETE ON departments
+FOR EACH ROW
+EXECUTE FUNCTION del_dep();
 
 CREATE OR REPLACE FUNCTION check_fever()
 RETURNS TRIGGER 
@@ -100,6 +93,13 @@ $$
 LANGUAGE plpgsql;
 
 
+-- TRIGGER FOR TEMPERATURE DECLARATION
+DROP TRIGGER IF EXISTS temp_declared ON health_declaration;
+CREATE TRIGGER temp_declared
+BEFORE INSERT ON health_declaration
+FOR EACH ROW EXECUTE FUNCTION check_fever();
+
+
 
 CREATE OR REPLACE PROCEDURE add_department 
 	(did integer,
@@ -112,7 +112,7 @@ $$
 LANGUAGE plpgsql;
 
 -- requires existing department to replace
-DROP PROCEDURE remove_department(integer);
+--DROP PROCEDURE remove_department(integer);
 CREATE OR REPLACE PROCEDURE remove_department
 	(id integer)
 AS $$
@@ -123,7 +123,7 @@ $$
 LANGUAGE plpgsql;
 
 
-DROP PROCEDURE add_room;
+--DROP PROCEDURE add_room;
 CREATE OR REPLACE PROCEDURE add_room
 	(floor integer,
 	room integer,
@@ -237,10 +237,10 @@ BEGIN
 		AND sp.sdate > CURRENT_DATE -3)
 
 	-- Delete meetings which were booked
-	DELETE FROM sessions s WHERE (s.book_id = closeContact.id AND s.sdate >= s_date AND s.sdate <= s_date + 7);
+	DELETE FROM sessions s WHERE (s.book_id IN (SELECT * FROM closeContact) AND s.sdate >= CURRENT_DATE AND s.sdate <= CURRENT_DATE + 7);
 
 	-- Remove meetings participating
-	UPDATE sessions
+	/*UPDATE sessions
 	SET curr_cap = curr_cap - 1
 	FROM sessions s, session_part sp, closeContact cc
 	WHERE sp.eid = cc.eid
@@ -249,9 +249,9 @@ BEGIN
 	AND s.room = sp.room
 	AND s.floor = sp.floor
 	AND s.sdate >= CURRENT_DATE
-	AND s.sdate <= CURRENT_DATE + 7;
+	AND s.sdate <= CURRENT_DATE + 7;*/
 	
-	DELETE FROM session_part sp WHERE (sp.eid = id AND sp.sdate >= s_date AND sp.sdate <= s_date + 7); 
+	DELETE FROM session_part sp WHERE (sp.eid = id AND sp.sdate >= CURRENT_DATE AND sp.sdate <= CURRENT_DATE + 7); 
 	
 	-- add to quarantine
 	UPDATE employees SET qe_date = CURRENT_DATE + 7 FROM closeContact cc, employees e WHERE cc.eid = e.eid;
@@ -273,7 +273,7 @@ LANGUAGE plpgsql;
 * Search room function seeks out all avail room
 * Assumption that updated table where one meeting room has one entry in mr update
 */
-DROP FUNCTION search_room;
+--DROP FUNCTION search_room;
 
 CREATE OR REPLACE FUNCTION search_room  
     (IN capacity INTEGER, IN intended_date DATE, IN start_hr TIME, IN end_hr TIME) 
@@ -295,7 +295,7 @@ CREATE OR REPLACE FUNCTION search_room
 				SELECT s.floor, s.room  
 				FROM sessions s
 				WHERE sdate = intended_date
-				AND stime > start_hr
+				AND stime >= start_hr
 				AND stime < end_hr
 				ORDER BY floor,room 
 			)
@@ -336,7 +336,7 @@ BEGIN
 	SELECT EXISTS(
 	SELECT fever from health_declaration hd
 	WHERE eid = booker_eid
-	AND ddate > CURRENT_DATE - integer '6'
+	AND ddate >= CURRENT_DATE - integer '6'
 	AND ddate <= CURRENT_DATE
 	AND fever = TRUE)
 	INTO hasFever;
@@ -463,9 +463,30 @@ BEGIN
 		AND ddate <= CURRENT_DATE
 		AND fever = TRUE)
 		INTO hasFever;
+
+		IF (j_etime <= j_stime) THEN
+			RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
+			RETURN;
+		END IF;
+		
+		IF hasFever THEN
+			RAISE NOTICE 'Exception caught: Employee has a fever and cannot join the meeting! No change made!'; 
+			RETURN;
+		END IF;
+		
+		IF NOT EXISTS (SELECT * from employees e INNER JOIN meetingRooms m ON e.did = m.did
+			WHERE e.eid = j_eid AND m.floor = j_floor AND m.room = j_room AND m.did = e.did) THEN
+			RAISE NOTICE 'Exception caught: Employee is not from this department and cannot join the meeting! No change made!';
+			RETURN;
+		END IF;
+
+		IF NOT EXISTS (SELECT 1 from health_declaration c WHERE c.eid = j_eid AND c.ddate = CURRENT_DATE) THEN
+			RAISE NOTICE 'Exception caught: Employee has not made his declaration and cannot join the meeting! No change made!'; 
+			RETURN;
+		END IF;
+
 	WHILE j_stime < j_etime LOOP
-		IF 	hasFever = 0 AND
-			EXISTS (SELECT 1 FROM sessions s
+		IF 	EXISTS (SELECT 1 FROM sessions s
 			WHERE s.floor = j_floor 
 			AND s.room = j_room 
 			AND s.sdate = j_sdate
@@ -485,7 +506,6 @@ BEGIN
 END
 $$
 LANGUAGE plpgsql;
-
 -- CALL join_meeting(1,1,'2021-11-01','08:00:00','09:00:00',1);
 
 --Leave meeting
@@ -499,6 +519,11 @@ CREATE OR REPLACE PROCEDURE leave_meeting
 	)
 AS $$
 BEGIN
+	IF (l_etime <= l_stime) THEN
+		RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
+		RETURN;
+	END IF;
+
 	IF EXISTS(SELECT * FROM session_part sp INNER JOIN sessions s 
 		ON sp.floor = s.floor 
 		AND sp.room = s.room 
@@ -520,6 +545,8 @@ BEGIN
 				/*UPDATE sessions s SET curr_cap = curr_cap - 1
 					WHERE s.floor = l_floor AND s.room = l_room AND s.sdate = l_sdate
 						AND (s.stime >= l_stime AND s.stime < l_etime);*/
+						ELSE
+			RAISE NOTICE 'No meetings found.'; 
 	END IF;
 END
 $$
@@ -536,14 +563,28 @@ CREATE OR REPLACE PROCEDURE approve_meeting
 	)
 AS $$
 BEGIN
+	IF (a_etime <= a_stime) THEN
+		RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
+		RETURN;
+	END IF;
+	
+	IF NOT EXISTS (SELECT * from employees e INNER JOIN meetingRooms m ON e.did = m.did
+		WHERE e.eid = a_eid AND m.floor = a_floor AND m.room = a_room AND m.did = e.did) THEN
+		RAISE NOTICE 'Exception caught: Employee is not from this department and cannot approve the meeting! No change made!';
+		RETURN;
+	END IF;
+
+	IF EXISTS(SELECT 1 FROM employees e WHERE e.eid = a_eid AND (e.kind = 1 OR e.kind = 0)) THEN
+		RAISE NOTICE 'Exception caught: Employee is not a Manager and cannot approve the meeting!, No change made!';
+		RETURN;
+	END IF;
+
 	IF EXISTS (SELECT 1 FROM sessions s
 		WHERE s.floor = a_floor 
 		AND s.room = a_room 
 		AND s.sdate = a_sdate
 		AND (s.stime >= a_stime AND s.stime < a_etime) 
 		AND s.approve_id IS NULL)
-		AND EXISTS (SELECT * from employees e INNER JOIN meetingRooms m ON e.did = m.did
-			WHERE e.eid = eid AND e.kind = 2 AND m.floor = floor AND m.room = room AND m.did = e.did)
 		THEN
 			UPDATE sessions s SET approve_id = a_eid
 				WHERE s.floor = a_floor 
@@ -551,6 +592,8 @@ BEGIN
 				AND s.sdate = a_sdate
 				AND (s.stime >= a_stime AND s.stime < a_etime) 
 				AND s.approve_id IS NULL;
+				ELSE
+			RAISE NOTICE 'No meetings to be approved within the given time.'; 
 	END IF;
 END
 $$
@@ -558,27 +601,34 @@ LANGUAGE plpgsql;
 
 -- CALL approve_meeting(1,1,'2021-11-01','08:00:00','09:00:00',1);
 
+
+
 -- View Future Meeting
 CREATE OR REPLACE FUNCTION view_future_meeting (f_sdate date, f_eid integer)
-RETURNS TABLE(Floor_Number INT,Room_Number INT, Date DATE, Start_hour time) AS $$
-SELECT floor ,room, sdate, stime
-FROM session_part sp
-WHERE sp.eid = f_eid
-AND sp.sdate >= f_sdate;
+	RETURNS TABLE(Floor_Number INT,Room_Number INT, Date DATE, Start_hour time) AS $$
+	SELECT s.floor , s.room, s.sdate, s.stime
+	FROM session_part sp INNER JOIN sessions s 
+	ON sp.stime = s.stime
+	AND sp.sdate = s.sdate
+	AND sp.room = s.room
+	AND sp.floor = s.floor
+	WHERE sp.eid = f_eid
+	AND sp.sdate >= f_sdate
+	AND s.approve_id IS NOT NULL
+	ORDER BY sp.sdate, sp.stime ASC;
 $$ LANGUAGE sql;
 
--- View Booking report (WIP for approve_id)
+-- View Booking report 
 CREATE OR REPLACE FUNCTION view_booking_report (b_sdate date, b_eid integer)
 RETURNS TABLE(Floor_Number INT,Room_Number INT, Date DATE, Start_hour time, isApproved VARCHAR(5)) AS $$
-SELECT floor ,room, sdate, stime,
-case COALESCE(approve_id, -1) 
-when -1 then 'False'
-else 'True'
-END
-FROM sessions s
-WHERE s.book_id = b_eid
-AND s.sdate >= b_sdate;
-
+	SELECT floor ,room, sdate, stime,
+	CASE COALESCE(approve_id, -1) 
+		WHEN -1 THEN 'False'
+		ELSE 'True'
+	END
+	FROM sessions s
+	WHERE s.book_id = b_eid
+	AND s.sdate >= b_sdate;
 $$ LANGUAGE sql;
 
 -- select * from view_booking_report('2020-10-10',1);
@@ -610,7 +660,7 @@ END;
 $$
 LANGUAGE plpgsql;
 
-CREATE TRIGGER curr_apacity_changed
+CREATE TRIGGER curr_capacity_changed
 AFTER INSERT OR DELETE ON session_part
 FOR EACH ROW EXECUTE function update_capacity();
 
@@ -619,15 +669,19 @@ CREATE OR REPLACE PROCEDURE change_capacity
 	(c_floor integer,
 	c_room integer,
 	c_capacity integer,
-	c_date DATE
+	c_date DATE,
+	c_eid integer
 	)
 AS $$
-BEGIN
+BEGIN	
+	IF EXISTS (SELECT * from employees e INNER JOIN meetingRooms m ON e.did = m.did
+		WHERE e.eid = c_eid AND e.kind = 2 AND m.floor = c_floor AND m.room = c_room AND m.did = e.did) THEN
 		UPDATE mr_update
-		SET udate = c_date 
-		AND new_cap = c_capacity
-		WHERE m.floor = c_floor 
-		AND m.room = c_room ;
+		SET udate = c_date, new_cap = c_capacity
+		WHERE floor = c_floor 
+		AND room = c_room ;
+		RETURN;
+	END IF;
 END
 $$
 LANGUAGE plpgsql;
