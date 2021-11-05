@@ -18,9 +18,9 @@ CREATE TABLE meetingRooms (
 );
 
 CREATE TABLE employees (
-   eid serial PRIMARY KEY,
+   eid integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
    ename VARCHAR(255),
-   email VARCHAR(255) UNIQUE,
+   email VARCHAR(255) UNIQUE GENERATED ALWAYS AS (REGEXP_REPLACE(ename, '\s', '_')|| CAST(eid AS VARCHAR(255)) || '@gmail.com') STORED,
    resigned_date DATE DEFAULT NULL,
    -- participation constraint
    did integer,
@@ -41,7 +41,7 @@ CREATE TABLE health_declaration (
    eid integer,
    ddate DATE NOT NULL DEFAULT CURRENT_DATE check (ddate >= CURRENT_DATE),
    temp float8 NOT NULL check (temp >= 34 AND temp <= 43),
-   fever boolean NOT NULL,
+   fever boolean GENERATED ALWAYS AS (temp > 37.5) STORED,
    PRIMARY KEY(eid, ddate),
    -- Weak entity
    FOREIGN KEY (eid) REFERENCES employees (eid) ON UPDATE CASCADE

@@ -154,15 +154,15 @@ LANGUAGE plpgsql;
 
 CREATE OR REPLACE PROCEDURE add_employee
 	(ename VARCHAR(255),
-	email VARCHAR(255),
 	did integer,
 	kind integer,
 	contact integer)
 AS $$
 DECLARE
-	id integer := 0; 
+	id integer := 0;
+	email VARCHAR(255):= '';
 BEGIN
-	INSERT INTO employees (ename, email, did, kind) VALUES (ename, email, did, kind);
+	INSERT INTO employees (ename, did, kind) VALUES (ename, did, kind);
 	SELECT LASTVAL() INTO id;
 	INSERT INTO eContacts VALUES (id, contact);
 END;
