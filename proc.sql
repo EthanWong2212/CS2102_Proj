@@ -704,6 +704,7 @@ FOR EACH ROW EXECUTE function update_sessions();
 
 
 -- non-compliance
+-- DROP FUNCTION IF EXISTS non_compliance(date, date);
 CREATE OR REPLACE FUNCTION non_compliance 
     (s_date DATE, e_date DATE) 
 RETURNS TABLE (eid integer, number_of_days integer) AS $$ 
