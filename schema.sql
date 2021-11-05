@@ -20,7 +20,7 @@ CREATE TABLE meetingRooms (
 CREATE TABLE employees (
    eid integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
    ename VARCHAR(255),
-   email VARCHAR(255) UNIQUE GENERATED ALWAYS AS (REGEXP_REPLACE(ename, '\s', '_')|| CAST(eid AS VARCHAR(255)) || '@gmail.com') STORED,
+   email VARCHAR(255) UNIQUE GENERATED ALWAYS AS (REPLACE(ename, ' ', '_')|| CAST(eid AS VARCHAR(255)) || '@gmail.com') STORED,
    resigned_date DATE DEFAULT NULL,
    -- participation constraint
    did integer,
@@ -82,9 +82,10 @@ CREATE TABLE sessions (
    sdate DATE,
    room integer,
    floor integer,
-   curr_cap integer,
+   curr_cap integer DEFAULT 1,
    approve_id integer,
-
+   bdate DATE NOT NULL check(bdate < sdate),
+   CONSTRAINT session_book UNIQUE (stime, sdate, book_id), 
    PRIMARY KEY (stime, sdate, room, floor),
    FOREIGN KEY (room, floor) REFERENCES meetingRooms (room, floor) ON UPDATE CASCADE,
    -- deletes meeting session when booker no longer authorized
@@ -102,7 +103,7 @@ CREATE TABLE session_part (
    floor integer,
    -- join participation constraint
    eid integer NOT NULL,
-
+   CONSTRAINT session_part_limit UNIQUE (stime, sdate, eid), 
    PRIMARY KEY (stime, sdate, room, floor, eid),
    FOREIGN KEY (stime, sdate, room, floor) REFERENCES sessions (stime, sdate, room, floor) ON DELETE CASCADE,
    FOREIGN KEY (eid) REFERENCES employees (eid) ON UPDATE CASCADE
