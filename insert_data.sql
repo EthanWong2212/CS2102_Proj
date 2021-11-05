@@ -1,3 +1,5 @@
+
+
 -- departments
 insert into departments (did, dname) values (1, 'Sales');
 insert into departments (did, dname) values (2, 'IT');
@@ -135,19 +137,49 @@ insert into meetingRooms (room, floor, did, rname) values (5, 4, 5, 'North Korea
 insert into meetingRooms (room, floor, did, rname) values (5, 5, 5, 'South Korea');
 
 -- insert sessions
--- past
-insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (1,'08:00:00', '2020-12-10', 1, 1, 8, 5, '2020-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (2,'09:00:00', '2020-12-10', 1, 1, 8, 5, '2020-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (4,'10:00:00', '2021-11-5', 1, 1, 5, 5, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (5,'08:00:00', '2021-11-3', 1, 1, 8, 8, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (1,'08:00:00', '2021-11-4', 1, 2, 5, 8, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (2,'08:00:00', '2021-12-4', 1, 1, 5, 8, '2021-11-5');
--- future
-insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (1,'08:00:00', '2021-12-10', 1, 1, 8, 5, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (2,'08:00:00', '2021-12-10', 1, 1, 5, 8, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (4,'08:00:00', '2021-12-10', 1, 1, 8, 5, '2021-11-5');
--- not approved
-insert into sessions (book_id, stime, sdate, room, floor, bdate) values (5,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, bdate) values (1,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, bdate) values (2,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, bdate) values (4,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');    
+-- past (for contact tracing)
+-- 3days ago
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (5,'08:00:00', '2021-11-2', 1, 3, 2, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('08:00:00', '2021-11-2', 1, 3, 5);
+insert into session_part (stime, sdate, room, floor, eid) values ('08:00:00', '2021-11-2', 1, 3, 9);
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (5,'09:00:00', '2021-11-2', 1, 3, 2, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('09:00:00', '2021-11-2', 1, 3, 5);
+insert into session_part (stime, sdate, room, floor, eid) values ('09:00:00', '2021-11-2', 1, 3, 9);    
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (5,'10:00:00', '2021-11-2', 1, 3, 2, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('10:00:00', '2021-11-2', 1, 3, 5);
+insert into session_part (stime, sdate, room, floor, eid) values ('10:00:00', '2021-11-2', 1, 3, 7);  
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (5,'14:00:00', '2021-11-2', 1, 3, 2, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('14:00:00', '2021-11-2', 1, 3, 5);
+insert into session_part (stime, sdate, room, floor, eid) values ('14:00:00', '2021-11-2', 1, 3, 6);     
+
+-- 2 days ago 2 meetings
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (1,'11:00:00', '2021-11-3', 1, 2, 2, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-3', 1, 2, 1);
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-3', 1, 2, 5);
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (2,'11:00:00', '2021-11-3', 1, 3, 2, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-3', 1, 3, 2);
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-3', 1, 3, 3);
+
+-- 1 day ago 3 meetings
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (1,'11:00:00', '2021-11-4', 1, 2, 3, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-4', 1, 2, 1);
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-4', 1, 2, 5);
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-4', 1, 2, 6);
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (2,'11:00:00', '2021-11-4', 1, 1, 2, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-4', 1, 1, 2);
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-4', 1, 1, 3);
+insert into sessions (book_id, stime, sdate, room, floor, curr_cap, approve_id, bdate) values (4,'11:00:00', '2021-11-4', 1, 3, 2, 8, '2021-11-1');
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-4', 1, 3, 4);
+insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2021-11-4', 1, 3, 7);
+
+
+
+-- future (for deletion)
+-- insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (1,'08:00:00', '2021-12-10', 1, 1, 8, 5, '2021-11-5');
+-- insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (2,'08:00:00', '2021-12-10', 1, 1, 5, 8, '2021-11-5');
+-- insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (4,'08:00:00', '2021-12-10', 1, 1, 8, 5, '2021-11-5');
+-- -- not approved
+-- insert into sessions (book_id, stime, sdate, room, floor, bdate) values (8,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');
+-- insert into sessions (book_id, stime, sdate, room, floor, bdate) values (8,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');
+-- insert into sessions (book_id, stime, sdate, room, floor, bdate) values (8,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');
+-- insert into sessions (book_id, stime, sdate, room, floor, bdate) values (8,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');    
