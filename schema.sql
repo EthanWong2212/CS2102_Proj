@@ -39,7 +39,7 @@ CREATE TABLE eContacts (
 
 CREATE TABLE health_declaration (
    eid integer,
-   ddate DATE NOT NULL DEFAULT CURRENT_DATE check (ddate >= CURRENT_DATE),
+   ddate DATE NOT NULL,
    temp float8 NOT NULL check (temp >= 34 AND temp <= 43),
    fever boolean GENERATED ALWAYS AS (temp > 37.5) STORED,
    PRIMARY KEY(eid, ddate),
@@ -82,9 +82,9 @@ CREATE TABLE sessions (
    sdate DATE,
    room integer,
    floor integer,
-   curr_cap integer DEFAULT 1,
+   curr_cap integer,
    approve_id integer,
-   bdate DATE NOT NULL check(bdate < sdate),
+   bdate DATE NOT NULL check(bdate <= sdate),
    CONSTRAINT session_book UNIQUE (stime, sdate, book_id), 
    PRIMARY KEY (stime, sdate, room, floor),
    FOREIGN KEY (room, floor) REFERENCES meetingRooms (room, floor) ON UPDATE CASCADE,

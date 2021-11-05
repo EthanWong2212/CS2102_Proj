@@ -79,12 +79,9 @@ AS $$
 BEGIN
 	IF NEW.temp > 37.5
 	THEN 
-		NEW.fever := TRUE;
 		DELETE FROM sessions s WHERE s.book_id = NEW.eid AND s.sdate >= NEW.ddate;
 		DELETE FROM session_part sp WHERE sp.eid = NEW.eid AND sp.sdate >= NEW.ddate;
-		EXECUTE contact_tracing(NEW.eid); 
-	ELSE
-		NEW.fever := FALSE;
+		--EXECUTE contact_tracing(NEW.eid); 
 	END IF;
 
 	RETURN NEW;
@@ -117,6 +114,9 @@ CREATE OR REPLACE PROCEDURE remove_department
 	(id integer)
 AS $$
 BEGIN
+	IF NOT EXISTS (SELECT * FROM departments d WHERE d.did = id) THEN
+		RAISE NOTICE 'Department does not exist.No changes made!';
+	END IF;
 	DELETE FROM departments d WHERE d.did = id;
 END;
 $$
@@ -160,7 +160,6 @@ CREATE OR REPLACE PROCEDURE add_employee
 AS $$
 DECLARE
 	id integer := 0;
-
 BEGIN
 	INSERT INTO employees (ename, did, kind) VALUES (ename, did, kind);
 	SELECT LASTVAL() INTO id;
@@ -177,6 +176,10 @@ CREATE OR REPLACE PROCEDURE remove_employee
 AS $$
 BEGIN
 	-- Set resign_date triggers resigning_employee;
+	IF NOT EXISTS (SELECT * FROM employees e WHERE e.eid = id) THEN
+		RAISE NOTICE 'Employee does not exist.No changes made!';
+	END IF;
+	
 	UPDATE employees
 	SET resigned_date = r_date
 	WHERE eid = id;
@@ -220,22 +223,41 @@ LANGUAGE plpgsql;
 -- $$ 
 -- LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION contact_tracing 
-	(id integer)
+DROP FUNCTION IF EXISTS contact_tracing;
+CREATE OR REPLACE FUNCTION contact_tracing(e_id integer)
 RETURNS TABLE (Eid integer)
 AS $$
+DECLARE
+hasRows integer := 0;
 BEGIN
-	WITH closeContact AS
+	WITH closeContact3 AS
 		(SELECT DISTINCT sp2.eid AS eid
 		FROM session_part sp, session_part sp2
-		WHERE sp.eid = id
-		AND sp2.eid <> id
+		WHERE sp.eid = e_id
+		AND sp2.eid <> e_id
 		AND sp2.stime = sp.stime
 		AND sp2.sdate = sp.sdate
 		AND sp2.room = sp.room
 		AND sp2.floor = sp.floor
-		AND sp.sdate > CURRENT_DATE -3)
+		AND sp.sdate > CURRENT_DATE -4
+		AND sp.sdate < CURRENT_DATE)
+		SELECT MAX(cc.eid) INTO hasRows
+		FROM closeContact3 cc;
+	IF hasRows IS NULL THEN
+	RAISE EXCEPTION 'Have not been in close contact';
+	END IF;
 
+	WITH closeContact AS
+		(SELECT DISTINCT sp2.eid AS eid
+		FROM session_part sp, session_part sp2
+		WHERE sp.eid = e_id
+		AND sp2.eid <> e_id
+		AND sp2.stime = sp.stime
+		AND sp2.sdate = sp.sdate
+		AND sp2.room = sp.room
+		AND sp2.floor = sp.floor
+		AND sp.sdate > CURRENT_DATE -4
+		AND sp.sdate < CURRENT_DATE)
 	-- Delete meetings which were booked
 	DELETE FROM sessions s WHERE (s.book_id IN (SELECT * FROM closeContact) AND s.sdate >= CURRENT_DATE AND s.sdate <= CURRENT_DATE + 7);
 
@@ -250,17 +272,47 @@ BEGIN
 	AND s.floor = sp.floor
 	AND s.sdate >= CURRENT_DATE
 	AND s.sdate <= CURRENT_DATE + 7;*/
+	WITH closeContact3 AS
+		(SELECT DISTINCT sp2.eid AS eid
+		FROM session_part sp, session_part sp2
+		WHERE sp.eid = e_id
+		AND sp2.eid <> e_id
+		AND sp2.stime = sp.stime
+		AND sp2.sdate = sp.sdate
+		AND sp2.room = sp.room
+		AND sp2.floor = sp.floor
+		AND sp.sdate > CURRENT_DATE -4
+		AND sp.sdate < CURRENT_DATE)
 	
-	DELETE FROM session_part sp WHERE (sp.eid = id AND sp.sdate >= CURRENT_DATE AND sp.sdate <= CURRENT_DATE + 7); 
+	DELETE FROM session_part sp WHERE (sp.eid IN (SELECT * FROM closeContact3) AND sp.sdate >= CURRENT_DATE AND sp.sdate <= CURRENT_DATE + 7); 
 	
+	WITH closeContact1 AS
+		(SELECT DISTINCT sp2.eid AS eid
+		FROM session_part sp, session_part sp2
+		WHERE sp.eid = e_id
+		AND sp2.eid <> e_id
+		AND sp2.stime = sp.stime
+		AND sp2.sdate = sp.sdate
+		AND sp2.room = sp.room
+		AND sp2.floor = sp.floor
+		AND sp.sdate > CURRENT_DATE -4
+		AND sp.sdate < CURRENT_DATE)
 	-- add to quarantine
-	UPDATE employees SET qe_date = CURRENT_DATE + 7 FROM closeContact cc, employees e WHERE cc.eid = e.eid;
-	UPDATE employees SET qe_date = CURRENT_DATE + 7 FROM employees e WHERE id = e.eid;
-
-
-
-	RETURN QUERY SELECT cc.eid FROM closeContact;
+	UPDATE employees e SET qe_date = CURRENT_DATE + 7 WHERE e.eid IN (SELECT cc.eid FROM closeContact1 cc);
+	UPDATE employees e SET qe_date = CURRENT_DATE + 7 WHERE e_id = e.eid;
 	
+	RETURN QUERY
+	WITH closeContact2 AS
+		(SELECT DISTINCT sp2.eid AS eid
+		FROM session_part sp, session_part sp2
+		WHERE sp.eid = e_id
+		AND sp2.eid <> e_id
+		AND sp2.stime = sp.stime
+		AND sp2.sdate = sp.sdate
+		AND sp2.room = sp.room
+		AND sp2.floor = sp.floor
+		AND sp.sdate > CURRENT_DATE - 4) 
+		SELECT cc.eid FROM closeContact2 cc;  
 END;
 $$
 LANGUAGE plpgsql;
@@ -331,6 +383,7 @@ DECLARE
 hasFever BOOLEAN; -- has fever for the past 7 days
 tempTime TIME; -- increments by 1
 endTime TIME;
+timeSlotTaken BOOLEAN;
 BEGIN
 
 	SELECT EXISTS(
@@ -340,6 +393,17 @@ BEGIN
 	AND ddate <= CURRENT_DATE
 	AND fever = TRUE)
 	INTO hasFever;
+
+	DELETE FROM sessions s WHERE s.bdate < CURRENT_DATE - integer '3' AND s.approve_id IS NULL;
+	RAISE NOTICE 'Meetings updated';
+	
+	SELECT EXISTS(
+	SELECT * from sessions
+	WHERE book_id = 1
+	AND sdate = booking_date
+	AND stime >= start_hr
+	AND stime < end_hr)
+	INTO timeSlotTaken;
 
 	-- SELECT fever from health_declaration hd
 	-- INTO hasFever
@@ -359,18 +423,28 @@ BEGIN
 		RETURN;
 	END IF;
 
-	IF NOT EXISTS (SELECT 1 from health_declaration c WHERE c.eid = booker_eid AND c.ddate = CURRENT_DATE) THEN
+	/*IF NOT EXISTS (SELECT 1 from health_declaration c WHERE c.eid = booker_eid AND c.ddate = CURRENT_DATE) THEN
 		RAISE NOTICE 'Exception caught: Employee has not made his declaration and no booking can be made! No change made!'; 
 		RETURN;
-	END IF;
+	END IF;*/
 
 	IF hasFever THEN
 		RAISE NOTICE 'Exception caught: Employee has a fever and no booking can be made! No change made!'; 
 		RETURN;
 	END IF;
+	
+	IF EXISTS (SELECT * FROM employees e WHERE e.eid = booker_eid AND (e.qe_date IS NOT NULL AND e.qe_date > CURRENT_DATE)) THEN
+		RAISE NOTICE 'Exception caught: Employee is in quarantine and cannot book the meeting! No change made!'; 
+		RETURN;
+	END IF;
+	
+	IF timeSlotTaken THEN
+		RAISE NOTICE 'Exception caught: Timeslot has been taken! No change made!'; 
+		RETURN;
+	END IF;
 
 	WHILE (tempTime < endTime) LOOP
-		INSERT INTO sessions (book_id , stime, sdate, room, floor, curr_cap, approve_id) values (booker_eid,tempTime,booking_date,room_num,floor_num,1,NULL);  
+		INSERT INTO sessions (book_id , stime, sdate, bdate, room, floor, curr_cap, approve_id) values (booker_eid,tempTime,booking_date,CURRENT_DATE,room_num,floor_num,0,NULL);  
 		INSERT INTO session_part (stime, sdate, room, floor, eid) VALUES (tempTime, booking_date, room_num, floor_num, booker_eid);
 		tempTime := tempTime + interval '1' hour;
 	END LOOP;		
@@ -463,27 +537,38 @@ BEGIN
 		AND ddate <= CURRENT_DATE
 		AND fever = TRUE)
 		INTO hasFever;
+		
+		/*IF (j_sdate < CURRENT_DATE) THEN
+			RAISE NOTICE 'Exception caught: Date entered is in the past, No change made!'; 
+			RETURN;
+		END IF;*/
 
 		IF (j_etime <= j_stime) THEN
 			RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
 			RETURN;
 		END IF;
 		
-		IF hasFever THEN
-			RAISE NOTICE 'Exception caught: Employee has a fever and cannot join the meeting! No change made!'; 
+		IF EXISTS (SELECT * FROM employees e WHERE e.eid = j_eid AND (e.qe_date IS NOT NULL AND e.qe_date > CURRENT_DATE)) THEN
+			RAISE NOTICE 'Exception caught: Employee is in quarantine and cannot join the meeting! No change made!'; 
 			RETURN;
 		END IF;
 		
-		IF NOT EXISTS (SELECT * from employees e INNER JOIN meetingRooms m ON e.did = m.did
+		IF hasFever THEN
+			RAISE NOTICE 'Exception caught: Employee has fever and cannot join the meeting! No change made!'; 
+			RETURN;
+		END IF;
+		
+		
+		/*IF NOT EXISTS (SELECT * from employees e INNER JOIN meetingRooms m ON e.did = m.did
 			WHERE e.eid = j_eid AND m.floor = j_floor AND m.room = j_room AND m.did = e.did) THEN
 			RAISE NOTICE 'Exception caught: Employee is not from this department and cannot join the meeting! No change made!';
 			RETURN;
-		END IF;
+		END IF;*/
 
-		IF NOT EXISTS (SELECT 1 from health_declaration c WHERE c.eid = j_eid AND c.ddate = CURRENT_DATE) THEN
+		/*IF NOT EXISTS (SELECT 1 from health_declaration c WHERE c.eid = j_eid AND c.ddate = CURRENT_DATE) THEN
 			RAISE NOTICE 'Exception caught: Employee has not made his declaration and cannot join the meeting! No change made!'; 
 			RETURN;
-		END IF;
+		END IF;*/
 
 	WHILE j_stime < j_etime LOOP
 		IF 	EXISTS (SELECT 1 FROM sessions s
@@ -523,31 +608,54 @@ BEGIN
 		RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
 		RETURN;
 	END IF;
+	
+	/*IF (l_sdate < CURRENT_DATE) THEN
+		RAISE NOTICE 'Exception caught: Date entered is in the past, No change made!'; 
+		RETURN;
+	END IF;*/
 
-	IF EXISTS(SELECT * FROM session_part sp INNER JOIN sessions s 
-		ON sp.floor = s.floor 
-		AND sp.room = s.room 
-		AND sp.sdate = s.sdate 
-		AND sp.stime = s.stime
+	WHILE l_stime < l_etime LOOP
+		IF EXISTS(SELECT * FROM sessions s 
 			WHERE s.floor = l_floor 
 			AND s.room = l_room 
 			AND s.sdate = l_sdate
 			AND (s.stime >= l_stime AND s.stime < l_etime) 
-			AND sp.eid = l_eid
+			AND s.book_id = l_eid
 			AND s.approve_id IS NULL)
-		THEN
-			DELETE FROM session_part sp 
-				WHERE sp.floor = l_floor 
-				AND sp.room = l_room 
-				AND sp.sdate = l_sdate
-				AND (sp.stime >= l_stime AND sp.stime < l_etime) 
-				AND sp.eid = l_eid;
-				/*UPDATE sessions s SET curr_cap = curr_cap - 1
-					WHERE s.floor = l_floor AND s.room = l_room AND s.sdate = l_sdate
-						AND (s.stime >= l_stime AND s.stime < l_etime);*/
-						ELSE
-			RAISE NOTICE 'No meetings found.'; 
-	END IF;
+				THEN
+				DELETE FROM sessions s
+					WHERE s.floor = l_floor 
+					AND s.room = l_room 
+					AND s.sdate = l_sdate
+					AND (s.stime >= l_stime AND s.stime < l_etime) 
+					AND s.book_id = l_eid;
+				l_stime := l_stime + interval '1 hour';
+		ELSIF EXISTS(SELECT * FROM session_part sp INNER JOIN sessions s 
+			ON sp.floor = s.floor 
+			AND sp.room = s.room 
+			AND sp.sdate = s.sdate 
+			AND sp.stime = s.stime
+				WHERE s.floor = l_floor 
+				AND s.room = l_room 
+				AND s.sdate = l_sdate
+				AND (s.stime >= l_stime AND s.stime < l_etime) 
+				AND sp.eid = l_eid
+				AND s.approve_id IS NULL)
+			THEN
+				DELETE FROM session_part sp 
+					WHERE sp.floor = l_floor 
+					AND sp.room = l_room 
+					AND sp.sdate = l_sdate
+					AND (sp.stime >= l_stime AND sp.stime < l_etime) 
+					AND sp.eid = l_eid;
+					/*UPDATE sessions s SET curr_cap = curr_cap - 1
+						WHERE s.floor = l_floor AND s.room = l_room AND s.sdate = l_sdate
+							AND (s.stime >= l_stime AND s.stime < l_etime);*/
+				l_stime := l_stime + interval '1 hour';
+			ELSE
+				l_stime := l_stime + interval '1 hour';
+		END IF;
+	END LOOP;
 END
 $$
 LANGUAGE plpgsql;
@@ -563,6 +671,11 @@ CREATE OR REPLACE PROCEDURE approve_meeting
 	)
 AS $$
 BEGIN
+	/*IF (a_sdate < CURRENT_DATE) THEN
+		RAISE NOTICE 'Exception caught: Date entered is in the past, No change made!'; 
+		RETURN;
+	END IF;*/
+	
 	IF (a_etime <= a_stime) THEN
 		RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
 		RETURN;
@@ -640,6 +753,7 @@ RETURNS TRIGGER
 AS $$
 BEGIN
 	IF (TG_OP = 'INSERT') THEN 
+		RAISE NOTICE 'A';
 		UPDATE sessions 
 		SET curr_cap = curr_cap + 1
 		WHERE stime = NEW.stime 
@@ -648,6 +762,7 @@ BEGIN
 		AND floor = NEW.floor;
 		RETURN NULL;
 	ELSIF (TG_OP = 'DELETE') THEN 
+		RAISE NOTICE 'B';
 		UPDATE sessions 
 		SET curr_cap = curr_cap - 1
 		WHERE stime = OLD.stime 
@@ -694,6 +809,7 @@ BEGIN
 	DELETE FROM sessions 
 	WHERE sdate >= NEW.udate
 	AND curr_cap > NEW.new_cap;
+	RETURN NEW;
 END;
 $$
 LANGUAGE plpgsql;
@@ -704,22 +820,23 @@ FOR EACH ROW EXECUTE function update_sessions();
 
 
 -- non-compliance
-CREATE OR REPLACE FUNCTION non_compliance 
-    (s_date DATE, e_date DATE) 
-RETURNS TABLE (eid integer, number_of_days integer) AS $$ 
-    SELECT e.eid, (e_date - s_date + 1 - count(h.ddate)) AS number_of_days 
-    FROM employees e LEFT JOIN health_declaration h 
-    ON e.eid = h.eid AND h.ddate >= s_date AND h.ddate <= e_date 
+DROP FUNCTION IF EXISTS non_compliance(date, date);
+CREATE OR REPLACE FUNCTION non_compliance(s_date DATE, e_date DATE) 
+RETURNS TABLE (eid integer, number_of_days bigint) AS $$  
+    SELECT e.eid, ((e_date - s_date + 1) - count(h.ddate)) AS number_of_days 
+    FROM employees e, health_declaration h 
+    WHERE e.eid = h.eid AND h.ddate >= s_date AND h.ddate <= e_date 
     GROUP BY e.eid 
-    HAVING count(h.ddate) < (e_date - s_date + 1) 
-    ORDER BY number_of_days DESC, e.eid ASC;
+    HAVING count(h.ddate) < (e_date - s_date +1) 
+    ORDER BY number_of_days DESC;
+	--RETURN QUERY SELECT eid, number_of_days from  
 $$ LANGUAGE sql; 
 
 -- view manager report
 CREATE OR REPLACE FUNCTION view_manager_report 
     (s_date DATE, id integer) 
-RETURNS TABLE (floor_number integer, room_number integer, date DATE, start_hour TIME, eid integer) AS $$ 
+RETURNS TABLE (floor_number integer, room_number integer, date DATE, start_hour TIME, eid integer) AS $$  
     SELECT s.floor, s.room, s.sdate, s.stime, s.approve_id 
     FROM employees e, sessions s 
-    WHERE id = e.eid AND e.kind = 0 AND s.sdate >= s_date AND s.approve_id IS NULL;
+    WHERE id = e.eid AND e.kind = 2 AND s.sdate >= s_date AND s.approve_id IS NULL;
 $$ LANGUAGE sql;

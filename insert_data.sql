@@ -176,10 +176,14 @@ insert into session_part (stime, sdate, room, floor, eid) values ('11:00:00', '2
 
 -- future (for deletion)
 insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (5,'08:00:00', '2021-12-11', 1, 1, 8, '2021-11-5');
+insert into session_part (stime, sdate, room, floor, eid) values ('08:00:00', '2021-12-11', 1, 1, 5);
 insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (5,'09:00:00', '2021-12-10', 1, 1, 5, '2021-11-5');
+insert into session_part (stime, sdate, room, floor, eid) values ('09:00:00', '2021-12-10', 1, 1, 5);
 insert into sessions (book_id, stime, sdate, room, floor, approve_id, bdate) values (1,'08:00:00', '2021-12-12', 1, 2, 8, '2021-11-5');
--- -- not approved
-insert into sessions (book_id, stime, sdate, room, floor, bdate) values (1,'08:00:00', '2021-12-10', 1, 1, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, bdate) values (2,'08:00:00', '2021-12-10', 1, 2, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, bdate) values (4,'08:00:00', '2021-12-10', 1, 3, '2021-11-5');
-insert into sessions (book_id, stime, sdate, room, floor, bdate) values (5,'08:00:00', '2021-12-10', 1, 4, '2021-11-5');    
+insert into session_part (stime, sdate, room, floor, eid) values ('08:00:00', '2021-12-12', 1, 2, 1);
+-- not approved
+-- insert into sessions (book_id, stime, sdate, room, floor, curr_cap, bdate) values (1,'08:00:00', '2021-12-10', 1, 1, 1, '2021-11-5');
+-- insert into session_part (stime, sdate, room, floor, eid) values ('08:00:00', '2021-12-11', 1, 1, 5);
+-- insert into sessions (book_id, stime, sdate, room, floor, bdate) values (2,'08:00:00', '2021-12-10', 1, 2, '2021-11-5');
+-- insert into sessions (book_id, stime, sdate, room, floor, bdate) values (4,'08:00:00', '2021-12-10', 1, 3, '2021-11-5');
+-- insert into sessions (book_id, stime, sdate, room, floor, bdate) values (5,'08:00:00', '2021-12-10', 1, 4, '2021-11-5');    
