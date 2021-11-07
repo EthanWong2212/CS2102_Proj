@@ -81,7 +81,48 @@ BEGIN
 	THEN 
 		DELETE FROM sessions s WHERE s.book_id = NEW.eid AND s.sdate >= NEW.ddate;
 		DELETE FROM session_part sp WHERE sp.eid = NEW.eid AND sp.sdate >= NEW.ddate;
-		--EXECUTE contact_tracing(NEW.eid); 
+		-- WITH closeContact AS
+		-- 	(SELECT DISTINCT sp2.eid AS eid
+		-- 	FROM session_part sp, session_part sp2
+		-- 	WHERE sp.eid = NEW.eid
+		-- 	AND sp2.eid <> NEW.eid
+		-- 	AND sp2.stime = sp.stime
+		-- 	AND sp2.sdate = sp.sdate
+		-- 	AND sp2.room = sp.room
+		-- 	AND sp2.floor = sp.floor
+		-- 	AND sp.sdate > NEW.ddate -4
+		-- 	AND sp.sdate < NEW.ddate)
+		-- -- Delete meetings which were booked
+		-- DELETE FROM sessions s WHERE (s.book_id IN (SELECT * FROM closeContact) AND s.sdate >= NEW.ddate AND s.sdate <= NEW.ddate + 7);
+
+		-- WITH closeContact1 AS
+		-- 	(SELECT DISTINCT sp2.eid AS eid
+		-- 	FROM session_part sp, session_part sp2
+		-- 	WHERE sp.eid = NEW.eid
+		-- 	AND sp2.eid <> NEW.eid
+		-- 	AND sp2.stime = sp.stime
+		-- 	AND sp2.sdate = sp.sdate
+		-- 	AND sp2.room = sp.room
+		-- 	AND sp2.floor = sp.floor
+		-- 	AND sp.sdate > NEW.ddate -4
+		-- 	AND sp.sdate < NEW.ddate)
+		
+		-- DELETE FROM session_part sp WHERE (sp.eid IN (SELECT * FROM closeContact1) AND sp.sdate >= NEW.ddate AND sp.sdate <= NEW.ddate + 7); 
+		
+		-- WITH closeContact2 AS
+		-- 	(SELECT DISTINCT sp2.eid AS eid
+		-- 	FROM session_part sp, session_part sp2
+		-- 	WHERE sp.eid = NEW.eid
+		-- 	AND sp2.eid <> NEW.eid
+		-- 	AND sp2.stime = sp.stime
+		-- 	AND sp2.sdate = sp.sdate
+		-- 	AND sp2.room = sp.room
+		-- 	AND sp2.floor = sp.floor
+		-- 	AND sp.sdate > NEW.ddate -4
+		-- 	AND sp.sdate < NEW.ddate)
+		-- -- add to quarantine
+		-- UPDATE employees e SET qe_date = NEW.ddate + 7 WHERE e.eid IN (SELECT cc.eid FROM closeContact2 cc);
+		-- UPDATE employees e SET qe_date = NEW.ddate + 7 WHERE e_id = e.eid;  
 	END IF;
 
 	RETURN NEW;
@@ -230,89 +271,74 @@ AS $$
 DECLARE
 hasRows integer := 0;
 BEGIN
-	WITH closeContact3 AS
-		(SELECT DISTINCT sp2.eid AS eid
-		FROM session_part sp, session_part sp2
-		WHERE sp.eid = e_id
-		AND sp2.eid <> e_id
-		AND sp2.stime = sp.stime
-		AND sp2.sdate = sp.sdate
-		AND sp2.room = sp.room
-		AND sp2.floor = sp.floor
-		AND sp.sdate > CURRENT_DATE -4
-		AND sp.sdate < CURRENT_DATE)
-		SELECT MAX(cc.eid) INTO hasRows
-		FROM closeContact3 cc;
-	IF hasRows IS NULL THEN
-	RAISE EXCEPTION 'Have not been in close contact';
+	IF EXISTS (SELECT eid FROM helath_declaration WHERE eid = e_id AND ddate = CURRENT_DATE AND fever = true;)
+	THEN  
+		RETURN QUERY
+		WITH closeContact3 AS
+			(SELECT DISTINCT sp2.eid AS eid
+			FROM session_part sp, session_part sp2
+			WHERE sp.eid = e_id
+			AND sp2.eid <> e_id
+			AND sp2.stime = sp.stime
+			AND sp2.sdate = sp.sdate
+			AND sp2.room = sp.room
+			AND sp2.floor = sp.floor
+			AND sp.sdate > CURRENT_DATE -4
+			AND sp.sdate < CURRENT_DATE)
+			SELECT MAX(cc.eid) INTO hasRows
+			FROM closeContact3 cc;
+		
+		IF hasRows IS NULL THEN
+		RAISE EXCEPTION 'Have not been in close contact';
+		END IF;
+
+			WITH closeContact AS
+				(SELECT DISTINCT sp2.eid AS eid
+				FROM session_part sp, session_part sp2
+				WHERE sp.eid = e_id
+				AND sp2.eid <> e_id
+				AND sp2.stime = sp.stime
+				AND sp2.sdate = sp.sdate
+				AND sp2.room = sp.room
+				AND sp2.floor = sp.floor
+				AND sp.sdate > CURRENT_DATE -4
+				AND sp.sdate < CURRENT_DATE)
+			-- Delete meetings which were booked
+			DELETE FROM sessions s WHERE (s.book_id IN (SELECT * FROM closeContact) AND s.sdate >= CURRENT_DATE AND s.sdate <= CURRENT_DATE + 7);
+
+			WITH closeContact3 AS
+				(SELECT DISTINCT sp2.eid AS eid
+				FROM session_part sp, session_part sp2
+				WHERE sp.eid = e_id
+				AND sp2.eid <> e_id
+				AND sp2.stime = sp.stime
+				AND sp2.sdate = sp.sdate
+				AND sp2.room = sp.room
+				AND sp2.floor = sp.floor
+				AND sp.sdate > CURRENT_DATE -4
+				AND sp.sdate < CURRENT_DATE)
+			
+			DELETE FROM session_part sp WHERE (sp.eid IN (SELECT * FROM closeContact3) AND sp.sdate >= CURRENT_DATE AND sp.sdate <= CURRENT_DATE + 7); 
+			
+			WITH closeContact1 AS
+				(SELECT DISTINCT sp2.eid AS eid
+				FROM session_part sp, session_part sp2
+				WHERE sp.eid = e_id
+				AND sp2.eid <> e_id
+				AND sp2.stime = sp.stime
+				AND sp2.sdate = sp.sdate
+				AND sp2.room = sp.room
+				AND sp2.floor = sp.floor
+				AND sp.sdate > CURRENT_DATE -4
+				AND sp.sdate < CURRENT_DATE)
+			-- add to quarantine
+			UPDATE employees e SET qe_date = CURRENT_DATE + 7 WHERE e.eid IN (SELECT cc.eid FROM closeContact1 cc);
+			UPDATE employees e SET qe_date = CURRENT_DATE + 7 WHERE e_id = e.eid;  
+	
+	ELSE
+	RAISE NOTICE 'Employee currently does not have a fever';
 	END IF;
 
-	WITH closeContact AS
-		(SELECT DISTINCT sp2.eid AS eid
-		FROM session_part sp, session_part sp2
-		WHERE sp.eid = e_id
-		AND sp2.eid <> e_id
-		AND sp2.stime = sp.stime
-		AND sp2.sdate = sp.sdate
-		AND sp2.room = sp.room
-		AND sp2.floor = sp.floor
-		AND sp.sdate > CURRENT_DATE -4
-		AND sp.sdate < CURRENT_DATE)
-	-- Delete meetings which were booked
-	DELETE FROM sessions s WHERE (s.book_id IN (SELECT * FROM closeContact) AND s.sdate >= CURRENT_DATE AND s.sdate <= CURRENT_DATE + 7);
-
-	-- Remove meetings participating
-	/*UPDATE sessions
-	SET curr_cap = curr_cap - 1
-	FROM sessions s, session_part sp, closeContact cc
-	WHERE sp.eid = cc.eid
-	AND s.stime = sp.stime
-	AND s.sdate = sp.sdate
-	AND s.room = sp.room
-	AND s.floor = sp.floor
-	AND s.sdate >= CURRENT_DATE
-	AND s.sdate <= CURRENT_DATE + 7;*/
-	WITH closeContact3 AS
-		(SELECT DISTINCT sp2.eid AS eid
-		FROM session_part sp, session_part sp2
-		WHERE sp.eid = e_id
-		AND sp2.eid <> e_id
-		AND sp2.stime = sp.stime
-		AND sp2.sdate = sp.sdate
-		AND sp2.room = sp.room
-		AND sp2.floor = sp.floor
-		AND sp.sdate > CURRENT_DATE -4
-		AND sp.sdate < CURRENT_DATE)
-	
-	DELETE FROM session_part sp WHERE (sp.eid IN (SELECT * FROM closeContact3) AND sp.sdate >= CURRENT_DATE AND sp.sdate <= CURRENT_DATE + 7); 
-	
-	WITH closeContact1 AS
-		(SELECT DISTINCT sp2.eid AS eid
-		FROM session_part sp, session_part sp2
-		WHERE sp.eid = e_id
-		AND sp2.eid <> e_id
-		AND sp2.stime = sp.stime
-		AND sp2.sdate = sp.sdate
-		AND sp2.room = sp.room
-		AND sp2.floor = sp.floor
-		AND sp.sdate > CURRENT_DATE -4
-		AND sp.sdate < CURRENT_DATE)
-	-- add to quarantine
-	UPDATE employees e SET qe_date = CURRENT_DATE + 7 WHERE e.eid IN (SELECT cc.eid FROM closeContact1 cc);
-	UPDATE employees e SET qe_date = CURRENT_DATE + 7 WHERE e_id = e.eid;
-	
-	RETURN QUERY
-	WITH closeContact2 AS
-		(SELECT DISTINCT sp2.eid AS eid
-		FROM session_part sp, session_part sp2
-		WHERE sp.eid = e_id
-		AND sp2.eid <> e_id
-		AND sp2.stime = sp.stime
-		AND sp2.sdate = sp.sdate
-		AND sp2.room = sp.room
-		AND sp2.floor = sp.floor
-		AND sp.sdate > CURRENT_DATE - 4) 
-		SELECT cc.eid FROM closeContact2 cc;  
 END;
 $$
 LANGUAGE plpgsql;
@@ -595,67 +621,59 @@ LANGUAGE plpgsql;
 
 --Leave meeting
 CREATE OR REPLACE PROCEDURE leave_meeting
-	(l_floor integer,
-	l_room integer,
-	l_sdate DATE,
-	l_stime time,
-	l_etime time,
-	l_eid integer
-	)
+ (l_floor integer,
+ l_room integer,
+ l_sdate DATE,
+ l_stime time,
+ l_etime time,
+ l_eid integer
+ )
 AS $$
 BEGIN
-	IF (l_etime <= l_stime) THEN
-		RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
-		RETURN;
-	END IF;
-	
-	/*IF (l_sdate < CURRENT_DATE) THEN
-		RAISE NOTICE 'Exception caught: Date entered is in the past, No change made!'; 
-		RETURN;
-	END IF;*/
-
-	WHILE l_stime < l_etime LOOP
-		IF EXISTS(SELECT * FROM sessions s 
-			WHERE s.floor = l_floor 
-			AND s.room = l_room 
-			AND s.sdate = l_sdate
-			AND (s.stime >= l_stime AND s.stime < l_etime) 
-			AND s.book_id = l_eid
-			AND s.approve_id IS NULL)
-				THEN
-				DELETE FROM sessions s
-					WHERE s.floor = l_floor 
-					AND s.room = l_room 
-					AND s.sdate = l_sdate
-					AND (s.stime >= l_stime AND s.stime < l_etime) 
-					AND s.book_id = l_eid;
-				l_stime := l_stime + interval '1 hour';
-		ELSIF EXISTS(SELECT * FROM session_part sp INNER JOIN sessions s 
-			ON sp.floor = s.floor 
-			AND sp.room = s.room 
-			AND sp.sdate = s.sdate 
-			AND sp.stime = s.stime
-				WHERE s.floor = l_floor 
-				AND s.room = l_room 
-				AND s.sdate = l_sdate
-				AND (s.stime >= l_stime AND s.stime < l_etime) 
-				AND sp.eid = l_eid
-				AND s.approve_id IS NULL)
-			THEN
-				DELETE FROM session_part sp 
-					WHERE sp.floor = l_floor 
-					AND sp.room = l_room 
-					AND sp.sdate = l_sdate
-					AND (sp.stime >= l_stime AND sp.stime < l_etime) 
-					AND sp.eid = l_eid;
-					/*UPDATE sessions s SET curr_cap = curr_cap - 1
-						WHERE s.floor = l_floor AND s.room = l_room AND s.sdate = l_sdate
-							AND (s.stime >= l_stime AND s.stime < l_etime);*/
-				l_stime := l_stime + interval '1 hour';
-			ELSE
-				l_stime := l_stime + interval '1 hour';
-		END IF;
-	END LOOP;
+ IF (l_etime <= l_stime) THEN
+  RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
+  RETURN;
+ END IF;
+ 
+ /*IF (l_sdate < CURRENT_DATE) THEN
+  RAISE NOTICE 'Exception caught: Date entered is in the past, No change made!'; 
+  RETURN;
+ END IF;*/
+ 
+ DELETE FROM sessions s
+   WHERE s.floor = l_floor 
+   AND s.room = l_room 
+   AND s.sdate = l_sdate
+   AND (s.stime >= l_stime AND s.stime < l_etime) 
+   AND s.book_id = l_eid
+   AND s.approve_id IS NULL;
+   
+ WHILE l_stime < l_etime LOOP
+  IF EXISTS(SELECT * FROM session_part sp INNER JOIN sessions s 
+   ON sp.floor = s.floor 
+   AND sp.room = s.room 
+   AND sp.sdate = s.sdate 
+   AND sp.stime = s.stime
+   WHERE s.floor = l_floor 
+   AND s.room = l_room 
+   AND s.sdate = l_sdate
+   AND (s.stime = l_stime) 
+   AND sp.eid = l_eid
+   AND s.approve_id IS NULL) THEN
+    DELETE FROM session_part sp 
+     WHERE sp.floor = l_floor 
+     AND sp.room = l_room 
+     AND sp.sdate = l_sdate
+     AND (sp.stime = l_stime) 
+     AND sp.eid = l_eid;
+     /*UPDATE sessions s SET curr_cap = curr_cap - 1
+      WHERE s.floor = l_floor AND s.room = l_room AND s.sdate = l_sdate
+       AND (s.stime >= l_stime AND s.stime < l_etime);*/
+   l_stime := l_stime + interval '1 hour';
+  ELSE
+   l_stime := l_stime + interval '1 hour';
+  END IF;
+ END LOOP;
 END
 $$
 LANGUAGE plpgsql;
