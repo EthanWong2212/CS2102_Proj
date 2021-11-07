@@ -364,11 +364,6 @@ BEGIN
 		RETURN;
 	END IF;
 
-	/*IF NOT EXISTS (SELECT 1 from health_declaration c WHERE c.eid = booker_eid AND c.ddate = CURRENT_DATE) THEN
-		RAISE NOTICE 'Exception caught: Employee has not made his declaration and no booking can be made! No change made!'; 
-		RETURN;
-	END IF;*/
-
 	IF hasFever THEN
 		RAISE NOTICE 'Exception caught: Employee has a fever and no booking can be made! No change made!'; 
 		RETURN;
@@ -437,8 +432,6 @@ END;
 $$
 LANGUAGE plpgsql;
 
--- CALL unbook_room(1,2,'2021-10-03','08:00:00','13:00:00' , 1);
--- SELECT * from sessions;
 
 -- Join meeting 
 CREATE OR REPLACE PROCEDURE join_meeting
@@ -492,9 +485,6 @@ BEGIN
 			AND s.curr_cap < (SELECT new_cap FROM mr_update m WHERE m.floor = j_floor AND m.room = j_room))
 		THEN
 			INSERT INTO session_part VALUES (j_stime, j_sdate, j_room, j_floor, j_eid);
-			/*UPDATE sessions s SET curr_cap = curr_cap + 1
-				WHERE s.floor = j_floor AND s.room = j_room AND s.sdate = j_sdate
-					AND s.stime = j_stime AND s.approve_id IS NULL;*/
 			j_stime := j_stime + interval '1 hour';
 		ELSE
 			j_stime := j_stime + interval '1 hour';
@@ -503,7 +493,6 @@ BEGIN
 END
 $$
 LANGUAGE plpgsql;
--- CALL join_meeting(1,1,'2021-11-01','08:00:00','09:00:00',1);
 
 --Leave meeting
 CREATE OR REPLACE PROCEDURE leave_meeting
@@ -520,11 +509,6 @@ BEGIN
   RAISE NOTICE 'Exception caught: Start hour cannot be more than or equal to end hour, No change made!'; 
   RETURN;
  END IF;
- 
- /*IF (l_sdate < CURRENT_DATE) THEN
-  RAISE NOTICE 'Exception caught: Date entered is in the past, No change made!'; 
-  RETURN;
- END IF;*/
  
  DELETE FROM sessions s
    WHERE s.floor = l_floor 
@@ -609,8 +593,6 @@ END
 $$
 LANGUAGE plpgsql;
 
--- CALL approve_meeting(1,1,'2021-11-01','08:00:00','09:00:00',1);
-
 
 
 -- View Future Meeting
@@ -641,7 +623,6 @@ RETURNS TABLE(Floor_Number INT,Room_Number INT, Date DATE, Start_hour time, isAp
 	AND s.sdate >= b_sdate;
 $$ LANGUAGE sql;
 
--- select * from view_booking_report('2020-10-10',1);
 
 -- Trigger to update capacity of sessions 
 DROP TRIGGER IF EXISTS curr_capacity_changed ON session_part;
