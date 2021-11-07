@@ -704,26 +704,23 @@ FOR EACH ROW EXECUTE function update_sessions();
 
 
 -- non-compliance
+-- DROP FUNCTION IF EXISTS non_compliance(date, date);
 CREATE OR REPLACE FUNCTION non_compliance 
     (s_date DATE, e_date DATE) 
 RETURNS TABLE (eid integer, number_of_days integer) AS $$ 
-BEGIN 
-    SELECT e.eid, ((e_date - s_date + 1) - count(h.ddate)) AS number_of_days 
-    FROM employees e, health_declaration h 
-    WHERE e.eid = h.eid AND h.ddate >= s_date AND h.ddate <= e_date 
+    SELECT e.eid, (e_date - s_date + 1 - count(h.ddate)) AS number_of_days 
+    FROM employees e LEFT JOIN health_declaration h 
+    ON e.eid = h.eid AND h.ddate >= s_date AND h.ddate <= e_date 
     GROUP BY e.eid 
-    HAVING count(h.ddate) < (e_date - s_date +1) 
-    ORDER BY number_of_days DESC;
-END; 
-$$ LANGUAGE plpgsql; 
+    HAVING count(h.ddate) < (e_date - s_date + 1) 
+    ORDER BY number_of_days DESC, e.eid ASC;
+$$ LANGUAGE sql; 
 
 -- view manager report
 CREATE OR REPLACE FUNCTION view_manager_report 
     (s_date DATE, id integer) 
 RETURNS TABLE (floor_number integer, room_number integer, date DATE, start_hour TIME, eid integer) AS $$ 
-BEGIN 
     SELECT s.floor, s.room, s.sdate, s.stime, s.approve_id 
     FROM employees e, sessions s 
     WHERE id = e.eid AND e.kind = 0 AND s.sdate >= s_date AND s.approve_id IS NULL;
-END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE sql;
