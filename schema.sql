@@ -3,15 +3,15 @@ DROP TABLE IF EXISTS departments, meetingRooms, employees, eContacts, health_dec
 
 CREATE TABLE departments (
    did integer PRIMARY KEY,
-   dname VARCHAR(255) UNIQUE
+   dname VARCHAR(255) UNIQUE NOT NULL
 );
 
 CREATE TABLE meetingRooms (
-	room integer,
-	floor integer,
+	room integer NOT NULL,
+	floor integer NOT NULL,
    -- If did, null meeting room does not exist
-   did integer,
-	rname VARCHAR(255),
+   did integer NOT NULL,
+	rname VARCHAR(255) NOT NULL,
 	PRIMARY KEY (room,floor),
    -- located in department
    FOREIGN KEY (did) REFERENCES departments (did) ON UPDATE CASCADE
@@ -19,7 +19,7 @@ CREATE TABLE meetingRooms (
 
 CREATE TABLE employees (
    eid integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-   ename VARCHAR(255),
+   ename VARCHAR(255) NOT NULL,
    email VARCHAR(255) UNIQUE GENERATED ALWAYS AS (REPLACE(ename, ' ', '_')|| CAST(eid AS VARCHAR(255)) || '@gmail.com') STORED,
    resigned_date DATE DEFAULT NULL,
    -- participation constraint
@@ -31,7 +31,7 @@ CREATE TABLE employees (
 );
 -- multivalue attribute of employees 
 CREATE TABLE eContacts (
-   eid integer,
+   eid integer NOT NULL,
    contact integer NOT NULL,
    PRIMARY KEY (eid, contact),
    FOREIGN KEY (eid) REFERENCES employees (eid) ON DELETE CASCADE
@@ -39,7 +39,7 @@ CREATE TABLE eContacts (
 
 CREATE TABLE health_declaration (
    eid integer,
-   ddate DATE NOT NULL,
+   ddate DATE,
    temp float8 NOT NULL check (temp >= 34 AND temp <= 43),
    fever boolean GENERATED ALWAYS AS (temp > 37.5) STORED,
    PRIMARY KEY(eid, ddate),
@@ -82,8 +82,8 @@ CREATE TABLE sessions (
    sdate DATE,
    room integer,
    floor integer,
-   curr_cap integer,
-   approve_id integer,
+   curr_cap integer NOT NULL,
+   approve_id integer NOT NULL,
    bdate DATE NOT NULL check(bdate <= sdate),
    CONSTRAINT session_book UNIQUE (stime, sdate, book_id), 
    PRIMARY KEY (stime, sdate, room, floor),
@@ -112,7 +112,7 @@ CREATE TABLE session_part (
 CREATE TABLE mr_update (
    eid integer NOT NULL,
    udate DATE,
-   new_cap integer,
+   new_cap integer NOT NULL,
    room integer,
    floor integer,
    PRIMARY KEY (udate, room, floor),
