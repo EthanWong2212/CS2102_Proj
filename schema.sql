@@ -10,7 +10,7 @@ CREATE TABLE meetingRooms (
 	room integer NOT NULL,
 	floor integer NOT NULL,
    -- If did, null meeting room does not exist
-   did integer NOT NULL,
+   did integer,
 	rname VARCHAR(255) NOT NULL,
 	PRIMARY KEY (room,floor),
    -- located in department
@@ -32,7 +32,7 @@ CREATE TABLE employees (
 -- multivalue attribute of employees 
 CREATE TABLE eContacts (
    eid integer NOT NULL,
-   contact integer NOT NULL,
+   contact integer NOT NULL UNIQUE,
    PRIMARY KEY (eid, contact),
    FOREIGN KEY (eid) REFERENCES employees (eid) ON DELETE CASCADE
 );
@@ -83,7 +83,7 @@ CREATE TABLE sessions (
    room integer,
    floor integer,
    curr_cap integer NOT NULL,
-   approve_id integer NOT NULL,
+   approve_id integer,
    bdate DATE NOT NULL check(bdate <= sdate),
    CONSTRAINT session_book UNIQUE (stime, sdate, book_id), 
    PRIMARY KEY (stime, sdate, room, floor),
