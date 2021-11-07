@@ -10,7 +10,7 @@ CREATE TABLE meetingRooms (
 	room integer NOT NULL,
 	floor integer NOT NULL,
    -- If did, null meeting room does not exist
-   did integer,
+    did integer,
 	rname VARCHAR(255) NOT NULL,
 	PRIMARY KEY (room,floor),
    -- located in department
@@ -46,34 +46,6 @@ CREATE TABLE health_declaration (
    -- Weak entity
    FOREIGN KEY (eid) REFERENCES employees (eid) ON UPDATE CASCADE
 );
-
-
--- CREATE TABLE quarantine (
---    eid integer PRIMARY KEY,
---    edate DATE NOT NULL
---    FOREIGN KEY (eid) REFERENCES employees (eid) ON UPDATE CASCADE
--- )
-
--- -- ISA employee
--- CREATE TABLE junior (
---    eid integer PRIMARY KEY,
---    FOREIGN KEY (eid) REFERENCES employees (eid) ON DELETE CASCADE
--- );
--- -- ISA employee
--- CREATE TABLE booker (
---    eid integer PRIMARY KEY,
---    FOREIGN KEY (eid) REFERENCES employees(eid) ON DELETE CASCADE
--- );
--- -- ISA booker
--- CREATE TABLE senior (
---    eid integer PRIMARY KEY,
---    FOREIGN KEY (eid) REFERENCES booker(eid) ON DELETE CASCADE
--- );
--- -- ISA booker
--- CREATE TABLE manager (
---    eid integer PRIMARY KEY,
---    FOREIGN KEY (eid) REFERENCES booker(eid) ON DELETE CASCADE
--- );
 
 CREATE TABLE sessions (
    -- participation constraint
@@ -119,12 +91,3 @@ CREATE TABLE mr_update (
    FOREIGN KEY (room, floor) REFERENCES meetingRooms (room, floor) ON DELETE CASCADE,
    FOREIGN KEY (eid) REFERENCES employees (eid) ON UPDATE CASCADE
 );
-
--- CREATE TABLE deleted_past_part (
---    eid integer NOT NULL PRIMARY KEY,
---    stime integer NOT NULL,
---    room integer NOT NULL,
---    floor integer NOT NULL,
---    PRIMARY KEY (eid, stime, room, floor),
---    FOREIGN KEY (eid) REFERENCES employees (eid) ON UPDATE CASCADE
--- );
